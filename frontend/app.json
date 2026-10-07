@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "CatatAgen",
+    "slug": "catatagen",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "catatagen",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.emergent.mobilesalesppob.wrwiiu"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#17803D"
+      },
+      "package": "com.emergent.mobilesalesppob.wrwiiu"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-image.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#17803D"
+        }
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-status-bar",
+      "expo-sharing",
+      "@react-native-community/datetimepicker",
+      "@react-native-vector-icons/lucide"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
