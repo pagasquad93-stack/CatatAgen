@@ -72,6 +72,10 @@ export default function InputScreen() {
       banks: byFrequency(BANKS, countBy(transactions.filter((t) => t.type !== "ppob").map((t) => t.bank))),
       kategori: byFrequency(KATEGORI, countBy(transactions.filter((t) => t.type === "ppob").map((t) => t.kategori))),
       templates: [...templates].sort((a, b) => (tplCounts.get(tplKey(b)) ?? 0) - (tplCounts.get(tplKey(a)) ?? 0)),
+      customers: [...countBy(transactions.map((t) => t.note.trim()).filter(Boolean)).entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([n]) => n),
     };
   }, [transactions, templates, type]);
 
@@ -261,6 +265,21 @@ export default function InputScreen() {
 
           <Label>Nama Pelanggan / Catatan</Label>
           <TextField value={note} onChange={setNote} placeholder="mis. Bu Sari" testID="note-input" />
+          {sorted.customers.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8, paddingTop: 10 }}>
+              {sorted.customers.map((n, i) => (
+                <Pressable
+                  key={n}
+                  testID={`customer-chip-${i}`}
+                  onPress={() => setNote(n)}
+                  style={({ pressed }) => [s.cust, note === n && s.custActive, pressed && { opacity: 0.7 }]}
+                >
+                  <Lucide name="user" size={14} color={note === n ? colors.onBrandPrimary : colors.brandPrimary} />
+                  <Text style={[s.custText, note === n && { color: colors.onBrandPrimary }]} numberOfLines={1}>{n}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
 
           <View style={s.summary}>
             <View style={{ flex: 1 }}>
@@ -310,6 +329,9 @@ const useS = makeStyles((c) => ({
   sumLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.8, color: c.onSurfaceTertiary },
   sumValue: { fontSize: 20, fontWeight: "800", fontFamily: MONO, color: c.onSurface, marginTop: 4 },
   foot: { textAlign: "center", fontSize: 12, color: c.muted },
+  cust: { flexDirection: "row", alignItems: "center", gap: 6, height: 36, paddingHorizontal: 12, borderRadius: 18, backgroundColor: c.brandTertiary, borderWidth: 1, borderColor: c.brandSecondary, flexShrink: 0, maxWidth: 180 },
+  custActive: { backgroundColor: c.brandPrimary, borderColor: c.brandPrimary },
+  custText: { fontSize: 13, fontWeight: "600", color: c.onBrandSecondary },
   editBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.brandSecondary, borderRadius: 12, paddingLeft: 12, marginBottom: 14 },
   editText: { flex: 1, fontSize: 13, fontWeight: "700", color: c.onBrandSecondary },
   editCancel: { height: 40, paddingHorizontal: 14, justifyContent: "center" },

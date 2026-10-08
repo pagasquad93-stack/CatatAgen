@@ -26,6 +26,10 @@ export type Template = Omit<Tx, "id" | "date" | "note" | "createdAt"> & { id: st
 
 export type AdminRange = { min: number; max: number; transfer: number; tarik: number };
 
+export type Expense = { id: string; date: string; category: string; amount: number; note: string; createdAt: string };
+
+export const EXPENSE_CATEGORIES = ["Listrik", "Internet/Pulsa", "Sewa", "Gaji", "Transport", "Makan/Minum", "ATK", "Lainnya"];
+
 export const DEFAULT_RANGES: AdminRange[] = [
   { min: 1, max: 500000, transfer: 3000, tarik: 5000 },
   { min: 500001, max: 1000000, transfer: 5000, tarik: 7000 },
@@ -47,7 +51,7 @@ export const adminFor = (ranges: AdminRange[], type: TxType, nominal: number) =>
   return type === "tarik" ? r.tarik : r.transfer;
 };
 
-const KEYS = { tx: "catatagen.transactions", tpl: "catatagen.templates", ranges: "catatagen.adminRanges" };
+const KEYS = { tx: "catatagen.transactions", tpl: "catatagen.templates", ranges: "catatagen.adminRanges", exp: "catatagen.expenses" };
 
 async function load<T>(key: string, fallback: T): Promise<T> {
   const raw = await storage.getItem(key, null);
@@ -64,13 +68,16 @@ type Ctx = {
   transactions: Tx[];
   templates: Template[];
   ranges: AdminRange[];
+  expenses: Expense[];
+  addExpense: (e: Expense) => void;
+  deleteExpense: (id: string) => void;
   addTx: (t: Tx) => void;
   updateTx: (t: Tx) => void;
   deleteTx: (id: string) => void;
   addTemplate: (t: Template) => void;
   deleteTemplate: (id: string) => void;
   saveRanges: (r: AdminRange[]) => void;
-  replaceAll: (d: { transactions: Tx[]; templates: Template[]; ranges: AdminRange[] }) => void;
+  replaceAll: (d: { transactions: Tx[]; templates: Template[]; ranges: AdminRange[]; expenses: Expense[] }) => void;
   toast: (msg: string, kind?: "ok" | "err") => void;
 };
 
@@ -87,6 +94,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTx] = useState<Tx[]>([]);
   const [templates, setTpl] = useState<Template[]>([]);
   const [ranges, setRanges] = useState<AdminRange[]>(DEFAULT_RANGES);
+  const [expenses, setExp] = useState<Expense[]>([]);
   const [toastMsg, setToastMsg] = useState<{ msg: string; kind: "ok" | "err" } | null>(null);
   const anim = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,6 +106,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setTx(await load(KEYS.tx, [] as Tx[]));
       setTpl(await load(KEYS.tpl, [] as Template[]));
       setRanges(await load(KEYS.ranges, DEFAULT_RANGES));
+      setExp(await load(KEYS.exp, [] as Expense[]));
       setReady(true);
     })();
   }, []);
@@ -113,6 +122,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const persistRanges = (v: AdminRange[]) => {
     setRanges(v);
     storage.setItem(KEYS.ranges, JSON.stringify(v));
+  };
+  const persistExp = (v: Expense[]) => {
+    setExp(v);
+    storage.setItem(KEYS.exp, JSON.stringify(v));
   };
 
   const toast = useCallback(
@@ -133,6 +146,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       transactions,
       templates,
       ranges,
+      expenses,
+      addExpense: (e) => persistExp([e, ...expenses]),
+      deleteExpense: (id) => persistExp(expenses.filter((e) => e.id !== id)),
       addTx: (t) => persistTx([t, ...transactions]),
       updateTx: (t) => persistTx(transactions.map((x) => (x.id === t.id ? t : x))),
       deleteTx: (id) => persistTx(transactions.filter((t) => t.id !== id)),
@@ -143,11 +159,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         persistTx(d.transactions);
         persistTpl(d.templates);
         persistRanges(d.ranges);
+        persistExp(d.expenses);
       },
       toast,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, transactions, templates, ranges, toast],
+    [ready, transactions, templates, ranges, expenses, toast],
   );
 
   return (

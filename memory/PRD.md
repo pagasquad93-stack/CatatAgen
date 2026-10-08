@@ -10,6 +10,9 @@ User choices: offline storage on phone only, same look as web (green CatatAgen),
 - Tabs: Input, Riwayat, Rekap, Admin, Backup (NativeTabs on iOS 26+, JS Tabs elsewhere).
 
 ## Implemented (Oct 2026)
+- Rekap: Harian/Mingguan/Bulanan/Tahunan, analisis jam ramai, pengeluaran vs laba (laba bersih), laba terbesar vs terendah, export Excel (.xlsx, 6 sheet)
+- Menu Pengeluaran Operasional (/pengeluaran): catat, kategori, hapus; ikut backup
+- Chip nama pelanggan yang sering muncul di Input Cepat
 - Edit transaksi from Riwayat (pencil → Input form prefilled, Simpan Perubahan / Batal)
 - Input Cepat sorts nominal (per type), bank, kategori PPOB and Template Cepat by most used
 - Input Cepat: Transfer / Tarik Tunai / PPOB, nominal chips, auto admin fee from ranges, bank chips, PPOB kategori/modal/jual, Untung hari ini card

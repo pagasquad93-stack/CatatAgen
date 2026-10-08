@@ -1,56 +1,43 @@
 import { Lucide } from "@react-native-vector-icons/lucide";
+import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppHeader, Card, MONO, ScreenTitle, Segmented } from "@/src/components/ui";
-import { fromISODate, longDate, MONTHS, rupiah, toISODate, todayISO } from "@/src/format";
+import { ExpenseVsProfit, PeakHours, ProfitRanking } from "@/src/components/rekap-sections";
+import { AppHeader, Button, Card, MONO, ScreenTitle, Segmented } from "@/src/components/ui";
+import { rupiah, todayISO } from "@/src/format";
 import { usesNativeTabs } from "@/src/navigation";
-import { omzetOf, profitOf, TxType, TYPE_LABEL, useStore } from "@/src/store";
+import { buildReport, exportXlsx, Mode, periodOf, shiftRef } from "@/src/report";
+import { TxType, TYPE_LABEL, useStore } from "@/src/store";
 import { makeStyles, useTheme } from "@/src/theme";
-
-type Mode = "day" | "month" | "year";
 
 export default function RekapScreen() {
   const s = useS();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
-  const { transactions } = useStore();
+  const { transactions, expenses, toast } = useStore();
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("day");
   const [ref, setRef] = useState(todayISO());
+  const [exporting, setExporting] = useState(false);
 
-  const d = fromISODate(ref);
-  const prefix = mode === "day" ? ref : mode === "month" ? ref.slice(0, 7) : ref.slice(0, 4);
-  const label = mode === "day" ? longDate(ref) : mode === "month" ? `${MONTHS[d.getMonth()]} ${d.getFullYear()}` : String(d.getFullYear());
+  const { start, end, label } = periodOf(mode, ref);
+  const shift = (dir: number) => setRef(shiftRef(mode, ref, dir));
+  const data = useMemo(() => buildReport(transactions, expenses, start, end), [transactions, expenses, start, end]);
 
-  const shift = (dir: number) => {
-    const n = new Date(d);
-    if (mode === "day") n.setDate(n.getDate() + dir);
-    else if (mode === "month") n.setMonth(n.getMonth() + dir, 1);
-    else n.setFullYear(n.getFullYear() + dir, 0, 1);
-    setRef(toISODate(n));
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      await exportXlsx(data, label, start, end);
+      toast("Laporan Excel siap");
+    } catch {
+      toast("Gagal membuat laporan Excel", "err");
+    } finally {
+      setExporting(false);
+    }
   };
-
-  const data = useMemo(() => {
-    const list = transactions.filter((t) => t.date.startsWith(prefix));
-    const per: Record<TxType, { count: number; profit: number; omzet: number }> = {
-      transfer: { count: 0, profit: 0, omzet: 0 },
-      tarik: { count: 0, profit: 0, omzet: 0 },
-      ppob: { count: 0, profit: 0, omzet: 0 },
-    };
-    list.forEach((t) => {
-      per[t.type].count++;
-      per[t.type].profit += profitOf(t);
-      per[t.type].omzet += omzetOf(t);
-    });
-    return {
-      count: list.length,
-      profit: list.reduce((a, t) => a + profitOf(t), 0),
-      omzet: list.reduce((a, t) => a + omzetOf(t), 0),
-      per,
-    };
-  }, [transactions, prefix]);
 
   return (
     <View style={s.root} testID="rekap-screen">
@@ -63,6 +50,7 @@ export default function RekapScreen() {
           onChange={setMode}
           options={[
             { key: "day", label: "Harian" },
+            { key: "week", label: "Mingguan" },
             { key: "month", label: "Bulanan" },
             { key: "year", label: "Tahunan" },
           ]}
@@ -106,6 +94,18 @@ export default function RekapScreen() {
             </View>
           ))}
         </Card>
+
+        <ExpenseVsProfit r={data} onManage={() => router.push("/pengeluaran")} />
+        <PeakHours r={data} />
+        <ProfitRanking r={data} />
+
+        <Button
+          label={exporting ? "Membuat laporan..." : "Export Laporan ke Excel (.xlsx)"}
+          icon="file-spreadsheet"
+          onPress={doExport}
+          disabled={exporting}
+          testID="export-xlsx-button"
+        />
       </ScrollView>
     </View>
   );

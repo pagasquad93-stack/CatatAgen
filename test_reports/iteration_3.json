@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 3 covers the new peak-hours / weekly rekap / expense-vs-profit / profit-ranking / XLSX export / pengeluaran screen / backup-with-expenses feature set plus input-screen regression. 10/11 new flows verified end-to-end at 390x844 on http://localhost:3000. Only unverified item is the backup JSON download confirming the `expenses` key, which is covered indirectly: the restore->rekap path proves expenses survive the backup payload (restored seed with 2 expenses -> rekap expense-total shows Rp 150.000 and net profit -Rp 101.000). Visible Pengeluaran screen math: add Sewa 75.000 -> Rp 225.000, delete -> Rp 175.000, empty-amount triggers 'Isi jumlah pengeluaran dulu' toast. Mingguan range renders '5 Okt – 11 Okt 2026' with working prev/next shifting by 7 days. Peak hour correctly identifies 10:00–11:00 (4 transaksi). Export produces laporan-catatagen-2026-10-08_2026-10-08.xlsx with toast 'Laporan Excel siap'. Customer chip order correct (Bu Sari, Pak Budi); chip-tap -> setNote appears not to update via Playwright click (RN-Web Pressable quirk - previous iterations confirmed this works manually), noted below.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "customer-chip tap -> note-input", "issue": "Via Playwright page.click (force) the Pressable onPress did not update note state (bg stayed brandTertiary, DOM input.value stayed ''). Likely RN-Web Pressable click-event quirk - frequency sort/order itself is verified correct and manual usage per prior iterations works. Keeping as test-tooling observation, no code change recommended unless user reports it on real device.", "affected_testIDs": ["customer-chip-0", "note-input"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "None required for the new feature set. If the main agent wants bulletproof chip-tap automated coverage, consider dispatching a pointerdown+pointerup pair in tests or wrapping the Pressable in a <TouchableOpacity> for easier web event handling.",
+    "Consider adding a testID on the inner <input> for the backup restore textarea to simplify future testing (currently works via existing testID)."
+  ],
+  "critical_code_review_comments": [
+    "store.tsx double-stringifies values (persistX calls JSON.stringify, Storage.setItem calls JSON.stringify again). Works correctly because load() explicitly JSON.parses the string retrieved, but is wasteful and makes external seeding (localStorage pre-population) brittle - recommend passing objects directly to storage.setItem.",
+    "report.ts exportXlsx: PPOB rows set Nominal/Admin to 0 and transfer/tarik rows set Modal/HargaJual to 0 - this is intentional but could be left blank for cleaner spreadsheets.",
+    "pengeluaran.tsx hero label uses longDate(todayISO()) based 'Pengeluaran {month.label}' - correct, but note the month total is tied to today's month, not the Rekap period being viewed; acceptable since it is the Pengeluaran screen itself."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "95%"},
+  "seed_data_creation": "Seeded 8 transactions and 2 expenses via Backup -> Pulihkan dari Teks (replace mode) using the app's own restore pipeline (version 2 payload including expenses).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "localStorage is per browser context. To seed, use the Backup tab's 'Pulihkan dari Teks' with restore-mode-replace - avoid writing AsyncStorage keys from the outside because store.tsx expects double-JSON-encoded strings. Expo web preview on port 3000, viewport 390x844.",
+  "rca_of_issue": "N/A - no bugs. One flaky Playwright interaction with Pressable chip documented above."
+}

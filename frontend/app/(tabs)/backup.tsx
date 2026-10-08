@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppHeader, Button, Card, ScreenTitle, Segmented, TextField } from "@/src/components/ui";
 import { todayISO } from "@/src/format";
 import { usesNativeTabs } from "@/src/navigation";
-import { AdminRange, Template, Tx, useStore } from "@/src/store";
+import { AdminRange, Expense, Template, Tx, useStore } from "@/src/store";
 import { makeStyles } from "@/src/theme";
 
 type Mode = "merge" | "replace";
@@ -19,12 +19,12 @@ export default function BackupScreen() {
   const s = useS();
   const insets = useSafeAreaInsets();
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
-  const { transactions, templates, ranges, replaceAll, toast } = useStore();
+  const { transactions, templates, ranges, expenses, replaceAll, toast } = useStore();
   const [mode, setMode] = useState<Mode>("merge");
   const [text, setText] = useState("");
 
   const backupJson = () =>
-    JSON.stringify({ app: "CatatAgen", version: 1, exportedAt: new Date().toISOString(), transactions, templates, adminRanges: ranges });
+    JSON.stringify({ app: "CatatAgen", version: 2, exportedAt: new Date().toISOString(), transactions, templates, adminRanges: ranges, expenses });
 
   const download = async () => {
     const json = backupJson();
@@ -57,7 +57,7 @@ export default function BackupScreen() {
   };
 
   const restore = (raw: string) => {
-    let data: { transactions?: Tx[]; templates?: Template[]; adminRanges?: AdminRange[] };
+    let data: { transactions?: Tx[]; templates?: Template[]; adminRanges?: AdminRange[]; expenses?: Expense[] };
     try {
       const parsed = JSON.parse(raw.trim());
       data = Array.isArray(parsed) ? { transactions: parsed } : parsed;
@@ -67,15 +67,18 @@ export default function BackupScreen() {
     }
     const inTx = data.transactions ?? [];
     const inTpl = data.templates ?? [];
+    const inExp = data.expenses ?? [];
     if (mode === "replace") {
-      replaceAll({ transactions: inTx, templates: inTpl, ranges: data.adminRanges?.length ? data.adminRanges : ranges });
+      replaceAll({ transactions: inTx, templates: inTpl, ranges: data.adminRanges?.length ? data.adminRanges : ranges, expenses: inExp });
     } else {
       const txIds = new Set(transactions.map((t) => t.id));
       const tplIds = new Set(templates.map((t) => t.id));
+      const expIds = new Set(expenses.map((e) => e.id));
       replaceAll({
         transactions: [...transactions, ...inTx.filter((t) => !txIds.has(t.id))],
         templates: [...templates, ...inTpl.filter((t) => !tplIds.has(t.id))],
         ranges,
+        expenses: [...expenses, ...inExp.filter((e) => !expIds.has(e.id))],
       });
     }
     setText("");
