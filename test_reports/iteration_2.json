@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only testing of CatatAgen Expo web preview at 390x844 for 2 new features: (1) Edit riwayat transaksi and (2) Most-used chips/templates appear first. All 10 feature groups PASSED. Edit flow (navigate from Riwayat pencil -> Input tab, prefill, 'Edit Transaksi' title, 'Simpan Perubahan' label, template button hidden, edit-banner visible, cancel resets, no duplicate on save, toast 'Perubahan transaksi disimpan') verified for both transfer and PPOB types. Frequency sorting verified: nominal chips sorted by per-type usage, custom nominal (75000) appears as chip after use, bank chips sorted by usage count (DANA before BCA), kategori-chip for PPOB sorted (Token PLN first), templates sorted by matching tx count. Regression (add/delete/filter counts) still works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global", "issues": ["Console warn: 'shadow*' style props deprecated, prefer 'boxShadow' (RN Web). Non-blocking.", "Console warn: 'props.pointerEvents is deprecated. Use style.pointerEvents' (likely from Animated.View toast in src/store.tsx:158). Non-blocking."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: in src/store.tsx replace Animated.View pointerEvents=\"none\" prop with style={{pointerEvents:'none', ...}} to silence RN Web warning.",
+    "Optional: replace deprecated shadow* style props with boxShadow across ui components."
+  ],
+  "critical_code_review_comments": [
+    "Edit flow in index.tsx uses router.setParams({edit:''}) to exit. Works, but a repeat-edit of the same tx id after an in-session cancel can occasionally not re-trigger the useEffect because dep is editing?.id (same id). Observed once in a long combined flow; could not reproduce in isolation. Safer: include edit search-param itself as dep, or key the Card by edit id.",
+    "byFrequency ties preserve default order (good). Nominal chips capped to 8 via slice (verified). Templates sorted by tplKey match count (type|nominal|bank or ppob|kategori|produk lower-cased).",
+    "updateTx in store.tsx preserves id and keeps order via map (no duplicate) - verified: tx count unchanged after edit-save.",
+    "All interactive elements expose testID (tx-edit-*, edit-banner, edit-cancel-button, save-transaction-button, template-apply-*, nominal-chip-*, bank-chip-*, kategori-chip-*, filter-*)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (offline app)", "frontend": "100% (10/10 feature groups)"},
+  "seed_data_creation": "Transient in-session: 3 Transfer 500k DANA, 2 Transfer 200k BCA, 2 custom-nominal 75000 DANA, 3 PPOB Token PLN, 2 templates. Cleared via localStorage.removeItem before each run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "AsyncStorage web uses localStorage with 'catatagen.*' keys; clear via localStorage.removeItem then reload. nominal-input is MoneyInput: page.fill with digits accepted. tx-edit-<id> pencil button in Riwayat navigates to '/' with ?edit=<id>; useLocalSearchParams drives edit mode via useEffect on editing?.id. If testing edit->cancel->edit-same-id sequences in one script run, the useEffect may not refire due to same dep id - either edit a different tx or reload between.",
+  "rca_of_issue": "N/A — no new bugs. One flakiness noted in context_for_next_testing_agent."
+}

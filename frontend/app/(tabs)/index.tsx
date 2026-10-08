@@ -1,5 +1,6 @@
 import { Lucide } from "@react-native-vector-icons/lucide";
-import React, { useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,12 +15,32 @@ const NOMINALS = [50000, 100000, 200000, 300000, 500000, 1000000, 1500000, 20000
 const BANKS = ["BCA", "BRI", "Mandiri", "BNI", "BSI", "DANA", "OVO", "GoPay", "ShopeePay"];
 const KATEGORI = ["Pulsa", "Paket Data", "Token PLN", "Tagihan PLN", "PDAM", "BPJS", "Game", "E-Wallet", "Lainnya"];
 
+// Most frequently used first; ties keep the original order.
+function byFrequency<T>(items: T[], counts: Map<T, number>) {
+  return items
+    .map((v, i) => ({ v, i, n: counts.get(v) ?? 0 }))
+    .sort((a, b) => b.n - a.n || a.i - b.i)
+    .map((x) => x.v);
+}
+
+function countBy<T>(values: T[]) {
+  const m = new Map<T, number>();
+  values.forEach((v) => m.set(v, (m.get(v) ?? 0) + 1));
+  return m;
+}
+
+const tplKey = (t: { type: TxType; nominal: number; bank: string; kategori: string; produk: string }) =>
+  t.type === "ppob" ? `ppob|${t.kategori}|${t.produk.trim().toLowerCase()}` : `${t.type}|${t.nominal}|${t.bank}`;
+
 export default function InputScreen() {
   const s = useS();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
-  const { transactions, templates, ranges, addTx, addTemplate, deleteTemplate, toast } = useStore();
+  const { transactions, templates, ranges, addTx, updateTx, addTemplate, deleteTemplate, toast } = useStore();
+  const router = useRouter();
+  const { edit } = useLocalSearchParams<{ edit?: string }>();
+  const editing = edit ? transactions.find((t) => t.id === edit) : undefined;
 
   const [type, setType] = useState<TxType>("transfer");
   const [date, setDate] = useState(todayISO());
@@ -41,6 +62,38 @@ export default function InputScreen() {
       omzet: list.reduce((a, t) => a + omzetOf(t), 0),
     };
   }, [transactions, today]);
+
+  const sorted = useMemo(() => {
+    const tf = transactions.filter((t) => t.type === type);
+    const extraNominals = [...new Set(tf.map((t) => t.nominal))].filter((n) => n > 0 && !NOMINALS.includes(n));
+    const tplCounts = countBy(transactions.map(tplKey));
+    return {
+      nominals: byFrequency([...NOMINALS, ...extraNominals], countBy(tf.map((t) => t.nominal))).slice(0, 8),
+      banks: byFrequency(BANKS, countBy(transactions.filter((t) => t.type !== "ppob").map((t) => t.bank))),
+      kategori: byFrequency(KATEGORI, countBy(transactions.filter((t) => t.type === "ppob").map((t) => t.kategori))),
+      templates: [...templates].sort((a, b) => (tplCounts.get(tplKey(b)) ?? 0) - (tplCounts.get(tplKey(a)) ?? 0)),
+    };
+  }, [transactions, templates, type]);
+
+  useEffect(() => {
+    if (!editing) return;
+    setType(editing.type);
+    setDate(editing.date);
+    setNominal(editing.nominal);
+    setAdmin(editing.admin);
+    setBank(editing.bank);
+    setKategori(editing.kategori);
+    setProduk(editing.produk);
+    setModal(editing.modal);
+    setJual(editing.jual);
+    setNote(editing.note);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing?.id, edit]);
+
+  const exitEdit = () => {
+    reset();
+    router.setParams({ edit: "" });
+  };
 
   const changeNominal = (n: number, t: TxType = type) => {
     setNominal(n);
@@ -66,6 +119,13 @@ export default function InputScreen() {
 
   const save = () => {
     if (!valid) return toast(type === "ppob" ? "Isi harga jual dulu" : "Isi nominal dulu", "err");
+    if (editing) {
+      updateTx({ ...editing, ...draft, date, note: note.trim() });
+      toast("Perubahan transaksi disimpan");
+      exitEdit();
+      router.navigate("/riwayat");
+      return;
+    }
     addTx({ ...draft, id: uid(), date, note: note.trim(), createdAt: new Date().toISOString() });
     toast(`Transaksi tersimpan · untung ${rupiah(profitOf(draft))}`);
     reset();
@@ -121,7 +181,7 @@ export default function InputScreen() {
             </Text>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 12 }}>
-              {templates.map((t, i) => (
+              {sorted.templates.map((t, i) => (
                 <View key={t.id} style={s.tpl}>
                   <Pressable testID={`template-apply-${i}`} onPress={() => applyTemplate(t)} style={s.tplBody}>
                     <Text style={s.tplName} numberOfLines={1}>{t.name}</Text>
@@ -137,7 +197,16 @@ export default function InputScreen() {
         </Card>
 
         <Card>
-          <Text style={[s.cardTitle, { marginBottom: 14 }]}>Input Cepat</Text>
+          {editing && (
+            <View style={s.editBar} testID="edit-banner">
+              <Lucide name="pencil" size={16} color={colors.onBrandSecondary} />
+              <Text style={s.editText}>Mode edit transaksi</Text>
+              <Pressable testID="edit-cancel-button" onPress={exitEdit} hitSlop={8} style={s.editCancel}>
+                <Text style={s.editCancelText}>Batal</Text>
+              </Pressable>
+            </View>
+          )}
+          <Text style={[s.cardTitle, { marginBottom: 14 }]}>{editing ? "Edit Transaksi" : "Input Cepat"}</Text>
           <Segmented
             testPrefix="type-tab"
             value={type}
@@ -157,7 +226,7 @@ export default function InputScreen() {
               <Label>{type === "transfer" ? "Nominal Transfer" : "Nominal Tarik Tunai"}</Label>
               <MoneyInput big value={nominal} onChange={(n) => changeNominal(n)} testID="nominal-input" />
               <ChipWrap>
-                {NOMINALS.map((n) => (
+                {sorted.nominals.map((n) => (
                   <Chip key={n} label={shortNominal(n)} active={nominal === n} onPress={() => changeNominal(n)} testID={`nominal-chip-${n}`} />
                 ))}
               </ChipWrap>
@@ -168,7 +237,7 @@ export default function InputScreen() {
 
               <Label>Bank / E-Wallet (opsional)</Label>
               <ChipWrap>
-                {BANKS.map((b) => (
+                {sorted.banks.map((b) => (
                   <Chip key={b} label={b} active={bank === b} onPress={() => setBank(bank === b ? "" : b)} testID={`bank-chip-${b}`} />
                 ))}
               </ChipWrap>
@@ -177,7 +246,7 @@ export default function InputScreen() {
             <>
               <Label>Kategori</Label>
               <ChipWrap>
-                {KATEGORI.map((k) => (
+                {sorted.kategori.map((k) => (
                   <Chip key={k} label={k} active={kategori === k} onPress={() => setKategori(k)} testID={`kategori-chip-${k}`} />
                 ))}
               </ChipWrap>
@@ -206,15 +275,15 @@ export default function InputScreen() {
             </View>
           </View>
 
-          <Button label="Simpan Transaksi" icon="check" onPress={save} testID="save-transaction-button" style={{ marginTop: 16 }} />
-          <Button
+          <Button label={editing ? "Simpan Perubahan" : "Simpan Transaksi"} icon="check" onPress={save} testID="save-transaction-button" style={{ marginTop: 16 }} />
+          {!editing && <Button
             label="Simpan jadi Template Cepat"
             icon="bookmark-plus"
             variant="outline"
             onPress={saveTemplate}
             testID="save-template-button"
             style={{ marginTop: 10 }}
-          />
+          />}
         </Card>
         <Text style={s.foot}>Data tersimpan offline di HP ini · {formatNum(transactions.length)} transaksi</Text>
       </KeyboardAwareScrollView>
@@ -241,4 +310,8 @@ const useS = makeStyles((c) => ({
   sumLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.8, color: c.onSurfaceTertiary },
   sumValue: { fontSize: 20, fontWeight: "800", fontFamily: MONO, color: c.onSurface, marginTop: 4 },
   foot: { textAlign: "center", fontSize: 12, color: c.muted },
+  editBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.brandSecondary, borderRadius: 12, paddingLeft: 12, marginBottom: 14 },
+  editText: { flex: 1, fontSize: 13, fontWeight: "700", color: c.onBrandSecondary },
+  editCancel: { height: 40, paddingHorizontal: 14, justifyContent: "center" },
+  editCancelText: { fontSize: 13, fontWeight: "700", color: c.error },
 }));

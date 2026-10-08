@@ -65,6 +65,7 @@ type Ctx = {
   templates: Template[];
   ranges: AdminRange[];
   addTx: (t: Tx) => void;
+  updateTx: (t: Tx) => void;
   deleteTx: (id: string) => void;
   addTemplate: (t: Template) => void;
   deleteTemplate: (id: string) => void;
@@ -133,6 +134,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       templates,
       ranges,
       addTx: (t) => persistTx([t, ...transactions]),
+      updateTx: (t) => persistTx(transactions.map((x) => (x.id === t.id ? t : x))),
       deleteTx: (id) => persistTx(transactions.filter((t) => t.id !== id)),
       addTemplate: (t) => persistTpl([...templates, t]),
       deleteTemplate: (id) => persistTpl(templates.filter((t) => t.id !== id)),
@@ -153,11 +155,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       {children}
       {toastMsg && (
         <Animated.View
-          pointerEvents="none"
           testID="toast"
           style={[
             styles.toast,
             {
+              pointerEvents: "none",
               top: insets.top + 12,
               backgroundColor: toastMsg.kind === "ok" ? colors.surfaceInverse : colors.error,
               opacity: anim,

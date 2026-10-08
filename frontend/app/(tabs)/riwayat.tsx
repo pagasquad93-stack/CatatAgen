@@ -1,4 +1,5 @@
 import { Lucide } from "@react-native-vector-icons/lucide";
+import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,6 +20,7 @@ export default function RiwayatScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
+  const router = useRouter();
   const { transactions, deleteTx, toast } = useStore();
   const [filter, setFilter] = useState<Filter>("all");
   const [toDelete, setToDelete] = useState<Tx | null>(null);
@@ -96,6 +98,14 @@ export default function RiwayatScreen() {
                 </Text>
               </View>
               <Text style={[s.rowProfit, profitOf(t) < 0 && { color: colors.error }]}>+{rupiah(profitOf(t))}</Text>
+              <Pressable
+                testID={`tx-edit-${t.id}`}
+                hitSlop={8}
+                onPress={() => router.navigate({ pathname: "/", params: { edit: t.id } })}
+                style={s.del}
+              >
+                <Lucide name="pencil" size={18} color={colors.brandPrimary} />
+              </Pressable>
               <Pressable testID={`tx-delete-${t.id}`} hitSlop={8} onPress={() => setToDelete(t)} style={s.del}>
                 <Lucide name="trash-2" size={18} color={colors.error} />
               </Pressable>
@@ -133,5 +143,5 @@ const useS = makeStyles((c) => ({
   rowTitle: { fontSize: 15, fontWeight: "700", color: c.onSurface },
   rowSub: { fontSize: 12, color: c.muted, marginTop: 2 },
   rowProfit: { fontSize: 14, fontWeight: "800", color: c.brandPrimary, fontFamily: MONO },
-  del: { width: 36, height: 44, alignItems: "center", justifyContent: "center" },
+  del: { width: 32, height: 44, alignItems: "center", justifyContent: "center" },
 }));
