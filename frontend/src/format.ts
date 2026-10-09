@@ -14,6 +14,12 @@ export const toISODate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1
 
 export const todayISO = () => toISODate(new Date());
 
+export const shiftDay = (s: string, dir: number) => {
+  const d = fromISODate(s);
+  d.setDate(d.getDate() + dir);
+  return toISODate(d);
+};
+
 export const fromISODate = (s: string) => {
   const [y, m, d] = s.split("-").map((x) => parseInt(x, 10));
   return new Date(y, (m || 1) - 1, d || 1);

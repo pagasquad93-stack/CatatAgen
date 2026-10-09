@@ -4,6 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BankSettingsCard } from "@/src/components/bank-settings";
 import { AppHeader, Button, Card, Label, MoneyInput, ScreenTitle } from "@/src/components/ui";
 import { usesNativeTabs } from "@/src/navigation";
 import { AdminRange, DEFAULT_RANGES, useStore } from "@/src/store";
@@ -83,6 +84,7 @@ export default function AdminScreen() {
           />
         </View>
         <Button label="Simpan Pengaturan" icon="check" onPress={save} testID="range-save-button" />
+        <BankSettingsCard />
       </KeyboardAwareScrollView>
     </View>
   );

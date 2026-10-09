@@ -5,14 +5,14 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { TargetHero } from "@/src/components/target-card";
 import { AppHeader, Button, Card, Chip, ChipWrap, DateField, Label, MONO, MoneyInput, Segmented, TextField } from "@/src/components/ui";
 import { formatNum, rupiah, shortNominal, todayISO, uid } from "@/src/format";
 import { usesNativeTabs } from "@/src/navigation";
-import { adminFor, omzetOf, profitOf, Template, TxType, TYPE_LABEL, useStore } from "@/src/store";
+import { adminFor, bankRoute, omzetOf, profitOf, Template, TxType, TYPE_LABEL, useStore } from "@/src/store";
 import { makeStyles, useTheme } from "@/src/theme";
 
 const NOMINALS = [50000, 100000, 200000, 300000, 500000, 1000000, 1500000, 2000000];
-const BANKS = ["BCA", "BRI", "Mandiri", "BNI", "BSI", "DANA", "OVO", "GoPay", "ShopeePay"];
 const KATEGORI = ["Pulsa", "Paket Data", "Token PLN", "Tagihan PLN", "PDAM", "BPJS", "Game", "E-Wallet", "Lainnya"];
 
 // Most frequently used first; ties keep the original order.
@@ -29,15 +29,15 @@ function countBy<T>(values: T[]) {
   return m;
 }
 
-const tplKey = (t: { type: TxType; nominal: number; bank: string; kategori: string; produk: string }) =>
-  t.type === "ppob" ? `ppob|${t.kategori}|${t.produk.trim().toLowerCase()}` : `${t.type}|${t.nominal}|${t.bank}`;
+const tplKey = (t: { type: TxType; nominal: number; bank: string; agentBank?: string; kategori: string; produk: string }) =>
+  t.type === "ppob" ? `ppob|${t.kategori}|${t.produk.trim().toLowerCase()}` : `${t.type}|${t.nominal}|${t.agentBank ?? ""}|${t.bank}`;
 
 export default function InputScreen() {
   const s = useS();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
-  const { transactions, templates, ranges, addTx, updateTx, addTemplate, deleteTemplate, toast } = useStore();
+  const { transactions, templates, ranges, settings, addTx, updateTx, addTemplate, deleteTemplate, toast } = useStore();
   const router = useRouter();
   const { edit } = useLocalSearchParams<{ edit?: string }>();
   const editing = edit ? transactions.find((t) => t.id === edit) : undefined;
@@ -47,6 +47,7 @@ export default function InputScreen() {
   const [nominal, setNominal] = useState(0);
   const [admin, setAdmin] = useState(0);
   const [bank, setBank] = useState("");
+  const [agentBank, setAgentBank] = useState("");
   const [kategori, setKategori] = useState("Pulsa");
   const [produk, setProduk] = useState("");
   const [modal, setModal] = useState(0);
@@ -67,9 +68,11 @@ export default function InputScreen() {
     const tf = transactions.filter((t) => t.type === type);
     const extraNominals = [...new Set(tf.map((t) => t.nominal))].filter((n) => n > 0 && !NOMINALS.includes(n));
     const tplCounts = countBy(transactions.map(tplKey));
+    const nonPpob = transactions.filter((t) => t.type !== "ppob");
     return {
       nominals: byFrequency([...NOMINALS, ...extraNominals], countBy(tf.map((t) => t.nominal))).slice(0, 8),
-      banks: byFrequency(BANKS, countBy(transactions.filter((t) => t.type !== "ppob").map((t) => t.bank))),
+      banks: byFrequency(settings.customerBanks, countBy(nonPpob.map((t) => t.bank))),
+      agentBanks: byFrequency(settings.agentBanks, countBy(nonPpob.map((t) => t.agentBank ?? ""))),
       kategori: byFrequency(KATEGORI, countBy(transactions.filter((t) => t.type === "ppob").map((t) => t.kategori))),
       templates: [...templates].sort((a, b) => (tplCounts.get(tplKey(b)) ?? 0) - (tplCounts.get(tplKey(a)) ?? 0)),
       customers: [...countBy(transactions.map((t) => t.note.trim()).filter(Boolean)).entries()]
@@ -77,7 +80,7 @@ export default function InputScreen() {
         .slice(0, 10)
         .map(([n]) => n),
     };
-  }, [transactions, templates, type]);
+  }, [transactions, templates, type, settings]);
 
   useEffect(() => {
     if (!editing) return;
@@ -86,6 +89,7 @@ export default function InputScreen() {
     setNominal(editing.nominal);
     setAdmin(editing.admin);
     setBank(editing.bank);
+    setAgentBank(editing.agentBank ?? "");
     setKategori(editing.kategori);
     setProduk(editing.produk);
     setModal(editing.modal);
@@ -108,13 +112,14 @@ export default function InputScreen() {
     if (t !== "ppob") setAdmin(adminFor(ranges, t, nominal));
   };
 
-  const draft = { type, nominal, admin, bank, kategori, produk, modal, jual };
+  const draft = { type, nominal, admin, bank, agentBank, kategori, produk, modal, jual };
   const valid = type === "ppob" ? jual > 0 : nominal > 0;
 
   const reset = () => {
     setNominal(0);
     setAdmin(0);
     setBank("");
+    setAgentBank("");
     setProduk("");
     setModal(0);
     setJual(0);
@@ -140,7 +145,7 @@ export default function InputScreen() {
     const name =
       type === "ppob"
         ? `${kategori}${produk ? ` · ${produk}` : ""}`
-        : `${TYPE_LABEL[type]} ${shortNominal(nominal)}${bank ? ` ${bank}` : ""}`;
+        : `${TYPE_LABEL[type]} ${shortNominal(nominal)}${bankRoute(draft) ? ` ${bankRoute(draft)}` : ""}`;
     addTemplate({ ...draft, id: uid(), name });
     toast("Template Cepat disimpan");
   };
@@ -150,6 +155,7 @@ export default function InputScreen() {
     setNominal(t.nominal);
     setAdmin(t.admin);
     setBank(t.bank);
+    setAgentBank(t.agentBank ?? "");
     setKategori(t.kategori);
     setProduk(t.produk);
     setModal(t.modal);
@@ -169,13 +175,7 @@ export default function InputScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[s.content, { paddingBottom: bottomChrome + 24 }]}
       >
-        <View style={s.hero} testID="today-profit-card">
-          <Text style={s.heroLabel}>UNTUNG HARI INI</Text>
-          <Text style={s.heroValue} testID="today-profit-value">{rupiah(stats.profit)}</Text>
-          <Text style={s.heroSub} testID="today-summary">
-            {stats.count} transaksi · omzet {rupiah(stats.omzet)}
-          </Text>
-        </View>
+        <TargetHero profit={stats.profit} count={stats.count} omzet={stats.omzet} />
 
         <Card>
           <Text style={s.cardTitle}>Template Cepat</Text>
@@ -239,12 +239,26 @@ export default function InputScreen() {
               <MoneyInput value={admin} onChange={setAdmin} testID="admin-input" />
               <Text style={s.hint}>Terisi sesuai rentang nominal, bisa diubah manual</Text>
 
-              <Label>Bank / E-Wallet (opsional)</Label>
+              <Label>{type === "transfer" ? "Bank / E-Wallet Agen (pengirim)" : "Bank / E-Wallet Agen (penerima)"}</Label>
+              <ChipWrap>
+                {sorted.agentBanks.map((b) => (
+                  <Chip key={b} label={b} active={agentBank === b} onPress={() => setAgentBank(agentBank === b ? "" : b)} testID={`agent-bank-chip-${b}`} />
+                ))}
+              </ChipWrap>
+
+              <Label>{type === "transfer" ? "Bank / E-Wallet Tujuan Pelanggan" : "Bank / E-Wallet Pelanggan (sumber)"}</Label>
               <ChipWrap>
                 {sorted.banks.map((b) => (
                   <Chip key={b} label={b} active={bank === b} onPress={() => setBank(bank === b ? "" : b)} testID={`bank-chip-${b}`} />
                 ))}
               </ChipWrap>
+              {(agentBank || bank) && (
+                <Text style={s.hint} testID="bank-route-label">
+                  {type === "transfer" ? "Alur: " : "Alur dana: "}
+                  {bankRoute(draft)}
+                </Text>
+              )}
+              <Text style={s.hint}>Atur daftar bank di menu Admin</Text>
             </>
           ) : (
             <>

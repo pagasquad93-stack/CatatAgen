@@ -1,0 +1,42 @@
+{
+  "summary": "Frontend-only testing for CatatAgen daily-target hero, bank routing for Transfer/Tarik, Admin bank settings, and date-scoped Riwayat. All 7 requested feature areas verified passing on viewport 390x844.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "Verified via two Playwright runs in-session (localStorage is per-context)."
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "store.tsx: settings merge uses `{...DEFAULT_SETTINGS, ...loaded}` which is correct for forward-compat (new keys get defaults when users have older stored settings).",
+    "target-card.tsx: percent uses Math.round, matches 'target 50.000 profit 5.000 => 10%'. Clamp to >=0 but not <=100 for display — intentional, allows exceeding target shown as >100%.",
+    "bankRoute(): tarik route = customer → agent, transfer route = agent → customer. Verified both directions on screen hint and in saved tx title.",
+    "Riwayat date filter: strict t.date === date equality is correct; counts chip reflect filtered-day only.",
+    "BankList add() uses case-insensitive dup check and shows error toast. Works as expected."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "seed_data_creation": "Each Playwright run creates its own data in localStorage; no persistent seed required.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Expo tab bar labels (text='Input'/'Riwayat') collide with on-screen titles ('Input Cepat'). Prefer navigating via `page.goto(\"/riwayat\")`, `/admin`, `/` directly, or click specific tab testIDs if available. Browser context is fresh each run; create+verify within one run.",
+  "verified_flows": [
+    "Hero defaults: Target Rp 100.000, 0%, 'Kurang Rp 100.000 lagi'.",
+    "target-edit-button opens sheet; target-chip-50000 + target-save-button saves and label becomes 'Target Rp 50.000'; after a 50.000 transfer (admin 3.000) percent becomes 6% and remaining 'Kurang Rp 47.000 lagi'.",
+    "Transfer bank route label shows 'Alur: BRI → BCA' (agent → customer); Tarik route shows 'Alur dana: BRI → BCA' (customer → agent) when agent=BCA customer=BRI.",
+    "Saved tx title in Riwayat shows 'Transfer · BRI → BCA' and 'Transfer · DANA → Mandiri'.",
+    "Admin bank-settings-card: agentBanks-add-button adds SeaBank → agentBanks-item-SeaBank appears and agent-bank-chip-SeaBank shows in Input Transfer; duplicate add shows error toast 'SeaBank sudah ada'; customerBanks-remove-GoPay removes and bank-chip-GoPay disappears from Input.",
+    "Riwayat defaults to today; today-only filter counts correctly (Semua/Transfer/Tarik/PPOB); riwayat-prev-day navigates to yesterday and shows the yesterday tx only; riwayat-today-button appears when not today and returns; direct YYYY-MM-DD typing into riwayat-date-input also works.",
+    "A tx created with yesterday date-input is NOT in today's Riwayat but visible after riwayat-prev-day.",
+    "Edit flow preserves agent bank + customer bank (edit route still 'BRI → BCA').",
+    "Template save keeps agentBank; apply template restores route 'BRI → BCA'.",
+    "Reload persistence: target 'Rp 50.000' persists, SeaBank persists in agent-bank chips, GoPay removal persists."
+  ]
+}

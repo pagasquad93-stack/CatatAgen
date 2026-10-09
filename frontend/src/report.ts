@@ -4,7 +4,7 @@ import { Platform } from "react-native";
 import * as XLSX from "xlsx";
 
 import { fromISODate, longDate, MONTHS, toISODate } from "@/src/format";
-import { Expense, omzetOf, profitOf, Tx, TxType, TYPE_LABEL } from "@/src/store";
+import { bankRoute, Expense, omzetOf, profitOf, Tx, TxType, TYPE_LABEL } from "@/src/store";
 
 export type Mode = "day" | "week" | "month" | "year";
 
@@ -90,7 +90,7 @@ export function buildReport(transactions: Tx[], expenses: Expense[], start: stri
 export type Report = ReturnType<typeof buildReport>;
 
 export const txTitle = (t: Tx) =>
-  t.type === "ppob" ? `${t.kategori}${t.produk ? ` · ${t.produk}` : ""}` : `${TYPE_LABEL[t.type]}${t.bank ? ` · ${t.bank}` : ""}`;
+  t.type === "ppob" ? `${t.kategori}${t.produk ? ` · ${t.produk}` : ""}` : `${TYPE_LABEL[t.type]}${bankRoute(t) ? ` · ${bankRoute(t)}` : ""}`;
 
 const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
@@ -119,6 +119,7 @@ export async function exportXlsx(r: Report, label: string, start: string, end: s
       Jam: new Date(t.createdAt).toTimeString().slice(0, 5),
       Jenis: TYPE_LABEL[t.type],
       "Bank/Kategori": t.type === "ppob" ? t.kategori : t.bank,
+      "Bank Agen": t.type === "ppob" ? "" : t.agentBank ?? "",
       Produk: t.produk,
       Nominal: t.type === "ppob" ? 0 : t.nominal,
       Admin: t.type === "ppob" ? 0 : t.admin,

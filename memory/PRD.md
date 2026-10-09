@@ -10,6 +10,9 @@ User choices: offline storage on phone only, same look as web (green CatatAgen),
 - Tabs: Input, Riwayat, Rekap, Admin, Backup (NativeTabs on iOS 26+, JS Tabs elsewhere).
 
 ## Implemented (Oct 2026)
+- Target laba harian (atur sendiri) + progress bar persen di layar Input
+- Riwayat per tanggal (default hari ini) dengan navigasi hari & pilih tanggal
+- Transfer/Tarik: tombol Bank/E-Wallet Agen + Pelanggan (daftar diatur di Admin), alur ditampilkan di riwayat & Excel
 - Rekap: Harian/Mingguan/Bulanan/Tahunan, analisis jam ramai, pengeluaran vs laba (laba bersih), laba terbesar vs terendah, export Excel (.xlsx, 6 sheet)
 - Menu Pengeluaran Operasional (/pengeluaran): catat, kategori, hapus; ikut backup
 - Chip nama pelanggan yang sering muncul di Input Cepat
