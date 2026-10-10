@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppHeader, Chip, ConfirmSheet, DateField, HScroll, MONO } from "@/src/components/ui";
 import { longDate, rupiah, shiftDay, todayISO } from "@/src/format";
 import { usesNativeTabs } from "@/src/navigation";
-import { bankRoute, omzetOf, profitOf, Tx, TxType, TYPE_LABEL, useStore } from "@/src/store";
+import { LunasStamp, StatusBadge } from "@/src/components/debt-ui";
+import { bankRoute, isDebtTx, isPaidOff, omzetOf, PAY_LABEL, profitOf, remainingOf, Tx, TxType, TYPE_LABEL, useStore } from "@/src/store";
 import { makeStyles, useTheme } from "@/src/theme";
 
 type Filter = "all" | TxType;
@@ -117,6 +118,15 @@ export default function RiwayatScreen() {
                 <Text style={s.rowSub} numberOfLines={1}>
                   {t.note || "Tanpa catatan"} · {rupiah(omzetOf(t))}
                 </Text>
+                {isDebtTx(t) && (
+                  <View style={{ marginTop: 4 }} testID={`tx-debt-${t.id}`}>
+                    {isPaidOff(t) ? (
+                      <LunasStamp small />
+                    ) : (
+                      <StatusBadge kind={t.payStatus === "belum" ? "err" : "warn"} label={`${PAY_LABEL[t.payStatus ?? "belum"]} · ${rupiah(remainingOf(t))}`} />
+                    )}
+                  </View>
+                )}
               </View>
               <Text style={[s.rowProfit, profitOf(t) < 0 && { color: colors.error }]}>+{rupiah(profitOf(t))}</Text>
               <Pressable

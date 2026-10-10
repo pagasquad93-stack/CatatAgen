@@ -10,6 +10,14 @@ User choices: offline storage on phone only, same look as web (green CatatAgen),
 - Tabs: Input, Riwayat, Rekap, Admin, Backup (NativeTabs on iOS 26+, JS Tabs elsewhere).
 
 ## Implemented (Oct 2026)
+- Piutang: Status Bayar (Lunas/Kurang Bayar/Belum Bayar) di Input; nominal kurang bayar; wajib nama pelanggan
+- Saran nama pelanggan muncul di atas kolom saat mengetik (dari Daftar Pelanggan)
+- Admin: Daftar Nama Pelanggan (otomatis tersimpan, isi manual, edit nama -> ikut ganti di transaksi, hapus)
+- Tab Piutang: total hutang, Top 5 grafik (Nominal/Jumlah Transaksi), tabel belum lunas >7 hari, daftar pelanggan + cari, Detail/Lunas/Cicil/Hapus
+- /piutang-detail: riwayat hutang per produk (tanggal, produk, hutang awal, dibayar, belum bayar), Tandai Lunas per produk, cap LUNAS, riwayat pembayaran
+- Cicil dipotong FIFO (hutang terlama dulu); Hapus = hapus catatan hutang saja (transaksi tetap)
+- Rekap: kartu Piutang 7 Hari Terakhir dengan cap LUNAS; Riwayat: badge status hutang
+- Backup v3 menyertakan customers & payments
 - Target laba harian (atur sendiri) + progress bar persen di layar Input
 - Riwayat per tanggal (default hari ini) dengan navigasi hari & pilih tanggal
 - Transfer/Tarik: tombol Bank/E-Wallet Agen + Pelanggan (daftar diatur di Admin), alur ditampilkan di riwayat & Excel

@@ -21,7 +21,25 @@ export type Tx = {
   jual: number;
   note: string;
   createdAt: string;
+  payStatus?: PayStatus; // undefined = lunas
+  debt?: number; // nominal hutang awal (belum / kurang bayar)
+  paid?: number; // sudah dibayar dari hutang
+  paidOffAt?: string; // waktu hutang lunas
+  debtCleared?: boolean; // catatan hutang dihapus manual
 };
+
+export type PayStatus = "lunas" | "kurang" | "belum";
+export const PAY_LABEL: Record<PayStatus, string> = { lunas: "Lunas", kurang: "Kurang Bayar", belum: "Belum Bayar" };
+
+export type Customer = { id: string; name: string; createdAt: string };
+export type Payment = { id: string; customer: string; amount: number; kind: "cicil" | "lunas"; createdAt: string };
+
+export const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+export const debtOf = (t: Tx) => (t.payStatus && t.payStatus !== "lunas" ? t.debt ?? 0 : 0);
+export const isDebtTx = (t: Tx) => debtOf(t) > 0 && !t.debtCleared;
+export const remainingOf = (t: Tx) => (isDebtTx(t) ? Math.max(0, debtOf(t) - (t.paid ?? 0)) : 0);
+export const isPaidOff = (t: Tx) => isDebtTx(t) && remainingOf(t) === 0;
+const txOrder = (a: Tx, b: Tx) => (a.date + a.createdAt).localeCompare(b.date + b.createdAt);
 
 export type Template = Omit<Tx, "id" | "date" | "note" | "createdAt"> & { id: string; name: string };
 
@@ -69,7 +87,24 @@ export const adminFor = (ranges: AdminRange[], type: TxType, nominal: number) =>
   return type === "tarik" ? r.tarik : r.transfer;
 };
 
-const KEYS = { tx: "catatagen.transactions", tpl: "catatagen.templates", ranges: "catatagen.adminRanges", exp: "catatagen.expenses", settings: "catatagen.settings" };
+const KEYS = {
+  tx: "catatagen.transactions",
+  tpl: "catatagen.templates",
+  ranges: "catatagen.adminRanges",
+  exp: "catatagen.expenses",
+  settings: "catatagen.settings",
+  cust: "catatagen.customers",
+  pay: "catatagen.payments",
+};
+
+const customersFromTx = (txs: Tx[], existing: Customer[] = []) => {
+  const out = [...existing];
+  txs.forEach((t) => {
+    const n = t.note.trim();
+    if (n && !out.some((c) => sameName(c.name, n))) out.push({ id: `${out.length}-${n}`.replace(/\s/g, ""), name: n, createdAt: t.createdAt });
+  });
+  return out;
+};
 
 async function load<T>(key: string, fallback: T): Promise<T> {
   const raw = await storage.getItem(key, null);
@@ -97,7 +132,23 @@ type Ctx = {
   addTemplate: (t: Template) => void;
   deleteTemplate: (id: string) => void;
   saveRanges: (r: AdminRange[]) => void;
-  replaceAll: (d: { transactions: Tx[]; templates: Template[]; ranges: AdminRange[]; expenses: Expense[] }) => void;
+  customers: Customer[];
+  payments: Payment[];
+  addCustomer: (name: string) => boolean;
+  renameCustomer: (id: string, name: string) => boolean;
+  deleteCustomer: (id: string) => void;
+  payDebt: (customer: string, amount: number) => number;
+  settleTx: (id: string) => void;
+  settleCustomer: (customer: string) => number;
+  clearCustomerDebt: (customer: string) => void;
+  replaceAll: (d: {
+    transactions: Tx[];
+    templates: Template[];
+    ranges: AdminRange[];
+    expenses: Expense[];
+    customers?: Customer[];
+    payments?: Payment[];
+  }) => void;
   toast: (msg: string, kind?: "ok" | "err") => void;
 };
 
@@ -116,6 +167,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [ranges, setRanges] = useState<AdminRange[]>(DEFAULT_RANGES);
   const [expenses, setExp] = useState<Expense[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [customers, setCust] = useState<Customer[]>([]);
+  const [payments, setPay] = useState<Payment[]>([]);
   const [toastMsg, setToastMsg] = useState<{ msg: string; kind: "ok" | "err" } | null>(null);
   const anim = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,7 +177,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      setTx(await load(KEYS.tx, [] as Tx[]));
+      const txs = await load(KEYS.tx, [] as Tx[]);
+      setTx(txs);
+      const savedCust = await load<Customer[] | null>(KEYS.cust, null);
+      if (savedCust) setCust(savedCust);
+      else {
+        const seeded = customersFromTx(txs);
+        setCust(seeded);
+        storage.setItem(KEYS.cust, JSON.stringify(seeded));
+      }
+      setPay(await load(KEYS.pay, [] as Payment[]));
       setTpl(await load(KEYS.tpl, [] as Template[]));
       setRanges(await load(KEYS.ranges, DEFAULT_RANGES));
       setExp(await load(KEYS.exp, [] as Expense[]));
@@ -149,6 +211,26 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setExp(v);
     storage.setItem(KEYS.exp, JSON.stringify(v));
   };
+  const persistCust = (v: Customer[]) => {
+    setCust(v);
+    storage.setItem(KEYS.cust, JSON.stringify(v));
+  };
+  const persistPay = (v: Payment[]) => {
+    setPay(v);
+    storage.setItem(KEYS.pay, JSON.stringify(v));
+  };
+  const ensureCustomer = (name: string) => {
+    const n = name.trim();
+    if (n && !customers.some((c) => sameName(c.name, n)))
+      persistCust([...customers, { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: n, createdAt: new Date().toISOString() }]);
+  };
+  const openDebts = (customer: string) =>
+    transactions.filter((t) => sameName(t.note, customer) && remainingOf(t) > 0).sort(txOrder);
+  const logPayment = (customer: string, amount: number, kind: Payment["kind"]) =>
+    persistPay([
+      { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, customer: customer.trim(), amount, kind, createdAt: new Date().toISOString() },
+      ...payments,
+    ]);
 
   const toast = useCallback(
     (msg: string, kind: "ok" | "err" = "ok") => {
@@ -176,22 +258,90 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       },
       addExpense: (e) => persistExp([e, ...expenses]),
       deleteExpense: (id) => persistExp(expenses.filter((e) => e.id !== id)),
-      addTx: (t) => persistTx([t, ...transactions]),
-      updateTx: (t) => persistTx(transactions.map((x) => (x.id === t.id ? t : x))),
+      addTx: (t) => {
+        persistTx([t, ...transactions]);
+        ensureCustomer(t.note);
+      },
+      updateTx: (t) => {
+        persistTx(transactions.map((x) => (x.id === t.id ? t : x)));
+        ensureCustomer(t.note);
+      },
       deleteTx: (id) => persistTx(transactions.filter((t) => t.id !== id)),
       addTemplate: (t) => persistTpl([...templates, t]),
       deleteTemplate: (id) => persistTpl(templates.filter((t) => t.id !== id)),
       saveRanges: persistRanges,
+      customers,
+      payments,
+      addCustomer: (name) => {
+        const n = name.trim();
+        if (!n || customers.some((c) => sameName(c.name, n))) return false;
+        ensureCustomer(n);
+        return true;
+      },
+      renameCustomer: (id, name) => {
+        const n = name.trim();
+        const cur = customers.find((c) => c.id === id);
+        if (!cur || !n) return false;
+        if (customers.some((c) => c.id !== id && sameName(c.name, n))) return false;
+        const old = cur.name;
+        persistCust(customers.map((c) => (c.id === id ? { ...c, name: n } : c)));
+        persistTx(transactions.map((t) => (sameName(t.note, old) ? { ...t, note: n } : t)));
+        persistPay(payments.map((p) => (sameName(p.customer, old) ? { ...p, customer: n } : p)));
+        return true;
+      },
+      deleteCustomer: (id) => persistCust(customers.filter((c) => c.id !== id)),
+      payDebt: (customer, amount) => {
+        let left = amount;
+        const now = new Date().toISOString();
+        const upd = new Map<string, Tx>();
+        openDebts(customer).forEach((t) => {
+          if (left <= 0) return;
+          const pay = Math.min(left, remainingOf(t));
+          left -= pay;
+          const paid = (t.paid ?? 0) + pay;
+          upd.set(t.id, { ...t, paid, paidOffAt: paid >= debtOf(t) ? now : t.paidOffAt });
+        });
+        const used = amount - left;
+        if (used > 0) {
+          persistTx(transactions.map((t) => upd.get(t.id) ?? t));
+          logPayment(customer, used, "cicil");
+        }
+        return used;
+      },
+      settleTx: (id) => {
+        const t = transactions.find((x) => x.id === id);
+        if (!t || remainingOf(t) <= 0) return;
+        const rem = remainingOf(t);
+        const now = new Date().toISOString();
+        persistTx(transactions.map((x) => (x.id === id ? { ...x, paid: debtOf(x), paidOffAt: now } : x)));
+        logPayment(t.note, rem, "lunas");
+      },
+      settleCustomer: (customer) => {
+        const open = openDebts(customer);
+        const total = open.reduce((a, t) => a + remainingOf(t), 0);
+        if (!total) return 0;
+        const ids = new Set(open.map((t) => t.id));
+        const now = new Date().toISOString();
+        persistTx(transactions.map((t) => (ids.has(t.id) ? { ...t, paid: debtOf(t), paidOffAt: now } : t)));
+        logPayment(customer, total, "lunas");
+        return total;
+      },
+      clearCustomerDebt: (customer) => {
+        persistTx(transactions.map((t) => (isDebtTx(t) && sameName(t.note, customer) ? { ...t, debtCleared: true } : t)));
+        persistPay(payments.filter((p) => !sameName(p.customer, customer)));
+      },
       replaceAll: (d) => {
         persistTx(d.transactions);
         persistTpl(d.templates);
         persistRanges(d.ranges);
         persistExp(d.expenses);
+        persistCust(customersFromTx(d.transactions, d.customers ?? customers));
+        persistPay(d.payments ?? payments);
       },
       toast,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, transactions, templates, ranges, expenses, settings, toast],
+    [ready, transactions, templates, ranges, expenses, settings, customers, payments, toast],
   );
 
   return (

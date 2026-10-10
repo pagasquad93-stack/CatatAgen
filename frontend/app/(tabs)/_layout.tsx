@@ -10,6 +10,7 @@ const TABS = [
   { name: "index", title: "Input", icon: "zap", sf: "bolt.fill" },
   { name: "riwayat", title: "Riwayat", icon: "history", sf: "clock.arrow.circlepath" },
   { name: "rekap", title: "Rekap", icon: "chart-column", sf: "chart.bar.fill" },
+  { name: "piutang", title: "Piutang", icon: "hand-coins", sf: "creditcard.fill" },
   { name: "admin", title: "Admin", icon: "sliders-horizontal", sf: "slider.horizontal.3" },
   { name: "backup", title: "Backup", icon: "hard-drive-download", sf: "externaldrive.fill" },
 ] as const;

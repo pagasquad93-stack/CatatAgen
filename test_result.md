@@ -101,3 +101,19 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+user_problem_statement: "CatatAgen offline Expo app - tambah fitur piutang pelanggan (status bayar, saran pelanggan, daftar pelanggan di admin, tab Piutang, cap LUNAS di rekap)"
+frontend:
+  - task: "Piutang pelanggan: status bayar, saran nama, daftar pelanggan admin, tab Piutang, detail, cicil/lunas/hapus, rekap 7 hari"
+    implemented: true
+    working: "NA"
+    file: "app/(tabs)/index.tsx, app/(tabs)/piutang.tsx, app/piutang-detail.tsx, src/store.tsx, src/components/customer-settings.tsx, src/components/piutang-recent.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Implemented; smoke tested via screenshots (FIFO cicil, lunas stamp, rename). No backend (offline AsyncStorage)."
+agent_communication:
+    - agent: "main"
+      message: "Frontend-only offline feature. Test ids: pay-status-*, kurang-bayar-input, customer-suggest-*, tab-piutang, piutang-cicil-0, cicil-amount-input, cicil-submit-button, piutang-detail-0, detail-tx-lunas-*, rekap-piutang-card, customer-edit-0."

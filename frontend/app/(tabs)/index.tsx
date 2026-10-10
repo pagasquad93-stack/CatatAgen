@@ -9,7 +9,7 @@ import { TargetHero } from "@/src/components/target-card";
 import { AppHeader, Button, Card, Chip, ChipWrap, DateField, Label, MONO, MoneyInput, Segmented, TextField } from "@/src/components/ui";
 import { formatNum, rupiah, shortNominal, todayISO, uid } from "@/src/format";
 import { usesNativeTabs } from "@/src/navigation";
-import { adminFor, bankRoute, omzetOf, profitOf, Template, TxType, TYPE_LABEL, useStore } from "@/src/store";
+import { adminFor, bankRoute, omzetOf, PayStatus, profitOf, sameName, Template, TxType, TYPE_LABEL, useStore } from "@/src/store";
 import { makeStyles, useTheme } from "@/src/theme";
 
 const NOMINALS = [50000, 100000, 200000, 300000, 500000, 1000000, 1500000, 2000000];
@@ -37,7 +37,7 @@ export default function InputScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
-  const { transactions, templates, ranges, settings, addTx, updateTx, addTemplate, deleteTemplate, toast } = useStore();
+  const { transactions, templates, ranges, settings, customers, addTx, updateTx, addTemplate, deleteTemplate, toast } = useStore();
   const router = useRouter();
   const { edit } = useLocalSearchParams<{ edit?: string }>();
   const editing = edit ? transactions.find((t) => t.id === edit) : undefined;
@@ -53,6 +53,8 @@ export default function InputScreen() {
   const [modal, setModal] = useState(0);
   const [jual, setJual] = useState(0);
   const [note, setNote] = useState("");
+  const [payStatus, setPayStatus] = useState<PayStatus>("lunas");
+  const [kurang, setKurang] = useState(0);
 
   const today = todayISO();
   const stats = useMemo(() => {
@@ -82,6 +84,22 @@ export default function InputScreen() {
     };
   }, [transactions, templates, type, settings]);
 
+  // Saran nama pelanggan saat mengetik (dari daftar pelanggan, urut sering dipakai)
+  const suggestions = useMemo(() => {
+    const q = note.trim().toLowerCase();
+    if (!q) return [];
+    const freq = countBy(transactions.map((t) => t.note.trim().toLowerCase()).filter(Boolean));
+    return customers
+      .map((c) => c.name)
+      .filter((n) => n.toLowerCase().includes(q) && !sameName(n, note))
+      .sort((a, b) => {
+        const sa = a.toLowerCase().startsWith(q) ? 0 : 1;
+        const sb = b.toLowerCase().startsWith(q) ? 0 : 1;
+        return sa - sb || (freq.get(b.toLowerCase()) ?? 0) - (freq.get(a.toLowerCase()) ?? 0) || a.localeCompare(b);
+      })
+      .slice(0, 8);
+  }, [note, customers, transactions]);
+
   useEffect(() => {
     if (!editing) return;
     setType(editing.type);
@@ -95,6 +113,8 @@ export default function InputScreen() {
     setModal(editing.modal);
     setJual(editing.jual);
     setNote(editing.note);
+    setPayStatus(editing.payStatus ?? "lunas");
+    setKurang(editing.payStatus === "kurang" ? editing.debt ?? 0 : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing?.id, edit]);
 
@@ -114,6 +134,20 @@ export default function InputScreen() {
 
   const draft = { type, nominal, admin, bank, agentBank, kategori, produk, modal, jual };
   const valid = type === "ppob" ? jual > 0 : nominal > 0;
+  const total = type === "ppob" ? jual : nominal + admin;
+  const debtAmount = payStatus === "belum" ? total : payStatus === "kurang" ? kurang : 0;
+
+  const payFields = () => {
+    if (payStatus === "lunas") return { payStatus: undefined, debt: undefined, paid: undefined, paidOffAt: undefined, debtCleared: undefined };
+    const prevPaid = editing?.debt ? Math.min(editing.paid ?? 0, debtAmount) : 0;
+    return {
+      payStatus,
+      debt: debtAmount,
+      paid: prevPaid,
+      paidOffAt: prevPaid >= debtAmount ? editing?.paidOffAt ?? new Date().toISOString() : undefined,
+      debtCleared: undefined,
+    };
+  };
 
   const reset = () => {
     setNominal(0);
@@ -124,19 +158,28 @@ export default function InputScreen() {
     setModal(0);
     setJual(0);
     setNote("");
+    setPayStatus("lunas");
+    setKurang(0);
   };
 
   const save = () => {
     if (!valid) return toast(type === "ppob" ? "Isi harga jual dulu" : "Isi nominal dulu", "err");
+    if (payStatus !== "lunas" && !note.trim()) return toast("Isi nama pelanggan untuk transaksi hutang", "err");
+    if (payStatus === "kurang" && kurang <= 0) return toast("Isi nominal kurang bayar dulu", "err");
+    if (payStatus === "kurang" && kurang > total) return toast("Kurang bayar melebihi total bayar", "err");
     if (editing) {
-      updateTx({ ...editing, ...draft, date, note: note.trim() });
+      updateTx({ ...editing, ...draft, ...payFields(), date, note: note.trim() });
       toast("Perubahan transaksi disimpan");
       exitEdit();
       router.navigate("/riwayat");
       return;
     }
-    addTx({ ...draft, id: uid(), date, note: note.trim(), createdAt: new Date().toISOString() });
-    toast(`Transaksi tersimpan · untung ${rupiah(profitOf(draft))}`);
+    addTx({ ...draft, ...payFields(), id: uid(), date, note: note.trim(), createdAt: new Date().toISOString() });
+    toast(
+      payStatus === "lunas"
+        ? `Transaksi tersimpan · untung ${rupiah(profitOf(draft))}`
+        : `Tersimpan · piutang ${note.trim()} ${rupiah(debtAmount)}`,
+    );
     reset();
   };
 
@@ -164,8 +207,8 @@ export default function InputScreen() {
     toast(`Template "${t.name}" dipakai, isi nama pelanggan`);
   };
 
-  const total = type === "ppob" ? jual : nominal + admin;
   const profit = profitOf(draft);
+  const showFrequent = !note.trim() || sorted.customers.some((n) => n === note);
 
   return (
     <View style={s.root} testID="input-screen">
@@ -278,8 +321,26 @@ export default function InputScreen() {
           )}
 
           <Label>Nama Pelanggan / Catatan</Label>
-          <TextField value={note} onChange={setNote} placeholder="mis. Bu Sari" testID="note-input" />
-          {sorted.customers.length > 0 && (
+          {suggestions.length > 0 && (
+            <View style={s.suggestWrap} testID="customer-suggestions">
+              <Text style={s.suggestTitle}>Saran pelanggan</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
+                {suggestions.map((n, i) => (
+                  <Pressable
+                    key={n}
+                    testID={`customer-suggest-${i}`}
+                    onPress={() => setNote(n)}
+                    style={({ pressed }) => [s.suggest, pressed && { opacity: 0.7 }]}
+                  >
+                    <Lucide name="user-check" size={14} color={colors.onBrandPrimary} />
+                    <Text style={s.suggestText} numberOfLines={1}>{n}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          <TextField value={note} onChange={setNote} placeholder="Ketik nama, saran muncul otomatis" testID="note-input" />
+          {showFrequent && sorted.customers.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8, paddingTop: 10 }}>
               {sorted.customers.map((n, i) => (
                 <Pressable
@@ -295,6 +356,46 @@ export default function InputScreen() {
             </ScrollView>
           )}
 
+          <Label>Status Bayar</Label>
+          <View style={s.payRow}>
+            {(
+              [
+                { key: "lunas", label: "Lunas", icon: "circle-check" },
+                { key: "kurang", label: "Kurang Bayar", icon: "circle-minus" },
+                { key: "belum", label: "Belum Bayar", icon: "circle-x" },
+              ] as const
+            ).map((o) => {
+              const active = payStatus === o.key;
+              const tone = o.key === "lunas" ? colors.brandPrimary : o.key === "kurang" ? colors.warning : colors.error;
+              return (
+                <Pressable
+                  key={o.key}
+                  testID={`pay-status-${o.key}`}
+                  onPress={() => setPayStatus(o.key)}
+                  style={({ pressed }) => [s.payBtn, active && { backgroundColor: tone, borderColor: tone }, pressed && { opacity: 0.75 }]}
+                >
+                  <Lucide name={o.icon} size={16} color={active ? colors.onBrandPrimary : tone} />
+                  <Text style={[s.payText, { color: active ? colors.onBrandPrimary : tone }]} numberOfLines={1}>{o.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {payStatus === "kurang" && (
+            <>
+              <Label>Nominal Kurang Bayar</Label>
+              <MoneyInput value={kurang} onChange={setKurang} testID="kurang-bayar-input" />
+              <Text style={s.hint} testID="kurang-bayar-hint">
+                {kurang > total ? "Melebihi total bayar" : `Dibayar sekarang ${rupiah(Math.max(0, total - kurang))} · hutang ${rupiah(kurang)}`}
+              </Text>
+            </>
+          )}
+          {payStatus === "belum" && (
+            <Text style={s.hint} testID="belum-bayar-hint">Seluruh {rupiah(total)} dicatat sebagai piutang pelanggan</Text>
+          )}
+          {payStatus !== "lunas" && !note.trim() && (
+            <Text style={[s.hint, { color: colors.error }]}>Wajib isi nama pelanggan untuk piutang</Text>
+          )}
+
           <View style={s.summary}>
             <View style={{ flex: 1 }}>
               <Text style={s.sumLabel}>{type === "ppob" ? "HARGA JUAL" : "TOTAL BAYAR"}</Text>
@@ -307,6 +408,12 @@ export default function InputScreen() {
               </Text>
             </View>
           </View>
+          {debtAmount > 0 && (
+            <View style={s.debtBox} testID="debt-summary">
+              <Text style={s.debtLabel}>PIUTANG PELANGGAN</Text>
+              <Text style={s.debtValue}>{rupiah(debtAmount)}</Text>
+            </View>
+          )}
 
           <Button label={editing ? "Simpan Perubahan" : "Simpan Transaksi"} icon="check" onPress={save} testID="save-transaction-button" style={{ marginTop: 16 }} />
           {!editing && <Button
@@ -346,6 +453,16 @@ const useS = makeStyles((c) => ({
   cust: { flexDirection: "row", alignItems: "center", gap: 6, height: 36, paddingHorizontal: 12, borderRadius: 18, backgroundColor: c.brandTertiary, borderWidth: 1, borderColor: c.brandSecondary, flexShrink: 0, maxWidth: 180 },
   custActive: { backgroundColor: c.brandPrimary, borderColor: c.brandPrimary },
   custText: { fontSize: 13, fontWeight: "600", color: c.onBrandSecondary },
+  suggestWrap: { backgroundColor: c.brandTertiary, borderRadius: 12, padding: 8, marginBottom: 8, gap: 6, borderWidth: 1, borderColor: c.brandSecondary },
+  suggestTitle: { fontSize: 11, fontWeight: "700", color: c.onBrandSecondary, letterSpacing: 0.5, marginLeft: 2 },
+  suggest: { flexDirection: "row", alignItems: "center", gap: 6, height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: c.brandPrimary, maxWidth: 200 },
+  suggestText: { fontSize: 14, fontWeight: "700", color: c.onBrandPrimary },
+  payRow: { flexDirection: "row", gap: 8 },
+  payBtn: { flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.surfaceSecondary, alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 4, paddingVertical: 6 },
+  payText: { fontSize: 12, fontWeight: "800" },
+  debtBox: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10, padding: 14, borderRadius: 14, backgroundColor: "#FDECEC" },
+  debtLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.8, color: c.error },
+  debtValue: { fontSize: 18, fontWeight: "800", fontFamily: MONO, color: c.error },
   editBar: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: c.brandSecondary, borderRadius: 12, paddingLeft: 12, marginBottom: 14 },
   editText: { flex: 1, fontSize: 13, fontWeight: "700", color: c.onBrandSecondary },
   editCancel: { height: 40, paddingHorizontal: 14, justifyContent: "center" },
