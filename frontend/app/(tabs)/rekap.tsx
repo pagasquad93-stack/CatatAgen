@@ -4,7 +4,6 @@ import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { PiutangRecent } from "@/src/components/piutang-recent";
 import { ExpenseVsProfit, PeakHours, ProfitRanking } from "@/src/components/rekap-sections";
 import { AppHeader, Button, Card, MONO, ScreenTitle, Segmented } from "@/src/components/ui";
 import { rupiah, todayISO } from "@/src/format";
@@ -96,7 +95,6 @@ export default function RekapScreen() {
           ))}
         </Card>
 
-        <PiutangRecent />
         <ExpenseVsProfit r={data} onManage={() => router.push("/pengeluaran")} />
         <PeakHours r={data} />
         <ProfitRanking r={data} />

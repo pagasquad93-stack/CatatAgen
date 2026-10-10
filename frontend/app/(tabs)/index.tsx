@@ -13,7 +13,6 @@ import { adminFor, bankRoute, omzetOf, PayStatus, profitOf, sameName, Template, 
 import { makeStyles, useTheme } from "@/src/theme";
 
 const NOMINALS = [50000, 100000, 200000, 300000, 500000, 1000000, 1500000, 2000000];
-const KATEGORI = ["Pulsa", "Paket Data", "Token PLN", "Tagihan PLN", "PDAM", "BPJS", "Game", "E-Wallet", "Lainnya"];
 
 // Most frequently used first; ties keep the original order.
 function byFrequency<T>(items: T[], counts: Map<T, number>) {
@@ -48,7 +47,13 @@ export default function InputScreen() {
   const [admin, setAdmin] = useState(0);
   const [bank, setBank] = useState("");
   const [agentBank, setAgentBank] = useState("");
-  const [kategori, setKategori] = useState("Pulsa");
+  const [kategori, setKategori] = useState(settings.ppobCategories[0] ?? "");
+
+  // Jika kategori terpilih dihapus di Admin, pilih kategori pertama yang tersedia
+  useEffect(() => {
+    if (!edit && !settings.ppobCategories.includes(kategori)) setKategori(settings.ppobCategories[0] ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.ppobCategories, edit]);
   const [produk, setProduk] = useState("");
   const [modal, setModal] = useState(0);
   const [jual, setJual] = useState(0);
@@ -75,7 +80,7 @@ export default function InputScreen() {
       nominals: byFrequency([...NOMINALS, ...extraNominals], countBy(tf.map((t) => t.nominal))).slice(0, 8),
       banks: byFrequency(settings.customerBanks, countBy(nonPpob.map((t) => t.bank))),
       agentBanks: byFrequency(settings.agentBanks, countBy(nonPpob.map((t) => t.agentBank ?? ""))),
-      kategori: byFrequency(KATEGORI, countBy(transactions.filter((t) => t.type === "ppob").map((t) => t.kategori))),
+      kategori: byFrequency(settings.ppobCategories, countBy(transactions.filter((t) => t.type === "ppob").map((t) => t.kategori))),
       templates: [...templates].sort((a, b) => (tplCounts.get(tplKey(b)) ?? 0) - (tplCounts.get(tplKey(a)) ?? 0)),
       customers: [...countBy(transactions.map((t) => t.note.trim()).filter(Boolean)).entries()]
         .sort((a, b) => b[1] - a[1])

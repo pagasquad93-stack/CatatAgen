@@ -6,7 +6,17 @@ import { Card } from "@/src/components/ui";
 import { Settings, useStore } from "@/src/store";
 import { makeStyles, useTheme } from "@/src/theme";
 
-function BankList({ field, title, desc }: { field: "agentBanks" | "customerBanks"; title: string; desc: string }) {
+function BankList({
+  field,
+  title,
+  desc,
+  placeholder = "mis. SeaBank",
+}: {
+  field: "agentBanks" | "customerBanks" | "ppobCategories";
+  title: string;
+  desc: string;
+  placeholder?: string;
+}) {
   const s = useS();
   const { colors } = useTheme();
   const { settings, saveSettings, toast } = useStore();
@@ -43,7 +53,7 @@ function BankList({ field, title, desc }: { field: "agentBanks" | "customerBanks
           testID={`${field}-input`}
           value={name}
           onChangeText={setName}
-          placeholder="mis. SeaBank"
+          placeholder={placeholder}
           placeholderTextColor={colors.muted}
           onSubmitEditing={add}
           returnKeyType="done"
@@ -65,6 +75,17 @@ export function BankSettingsCard() {
       <Text style={s.desc}>Tombol pilihan di Input Cepat untuk Transfer & Tarik Tunai.</Text>
       <BankList field="agentBanks" title="Milik Agen" desc="Rekening / e-wallet yang agen pakai" />
       <BankList field="customerBanks" title="Pelanggan / Tujuan" desc="Bank tujuan (transfer) atau sumber dana (tarik tunai)" />
+    </Card>
+  );
+}
+
+export function PpobCategoryCard() {
+  const s = useS();
+  return (
+    <Card testID="ppob-category-card">
+      <Text style={s.title}>Kategori PPOB</Text>
+      <Text style={s.desc}>Tombol kategori di Input Cepat untuk transaksi PPOB.</Text>
+      <BankList field="ppobCategories" title="Daftar Kategori" desc="Tambah atau hapus kategori sesuai kebutuhan" placeholder="mis. Voucher TV" />
     </Card>
   );
 }

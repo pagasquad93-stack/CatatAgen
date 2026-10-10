@@ -91,7 +91,7 @@ export default function RiwayatScreen() {
       <FlatList
         data={rows}
         keyExtractor={(r) => (r.kind === "head" ? `h-${r.date}` : r.tx.id)}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: bottomChrome + 24, flexGrow: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: bottomChrome + 24, flexGrow: 1 }}
         ListEmptyComponent={
           <View style={s.empty} testID="riwayat-empty">
             <Lucide name="inbox" size={40} color={colors.borderStrong} />

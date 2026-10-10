@@ -49,10 +49,13 @@ export type Expense = { id: string; date: string; category: string; amount: numb
 
 export const EXPENSE_CATEGORIES = ["Listrik", "Internet/Pulsa", "Sewa", "Gaji", "Transport", "Makan/Minum", "ATK", "Lainnya"];
 
-export type Settings = { dailyTarget: number; agentBanks: string[]; customerBanks: string[] };
+export type Settings = { dailyTarget: number; agentBanks: string[]; customerBanks: string[]; ppobCategories: string[] };
+
+export const PPOB_CATEGORIES = ["Pulsa", "Paket Data", "Token PLN", "Tagihan PLN", "PDAM", "BPJS", "Game", "E-Wallet", "Lainnya"];
 
 export const DEFAULT_SETTINGS: Settings = {
   dailyTarget: 100000,
+  ppobCategories: PPOB_CATEGORIES,
   agentBanks: ["BRI", "BCA", "DANA"],
   customerBanks: ["BCA", "BRI", "Mandiri", "BNI", "BSI", "DANA", "OVO", "GoPay", "ShopeePay"],
 };
