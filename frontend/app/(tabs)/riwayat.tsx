@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppHeader, Chip, ConfirmSheet, DateField, HScroll, MONO } from "@/src/components/ui";
+import { AppHeader, ConfirmSheet, DateField, MONO } from "@/src/components/ui";
 import { longDate, rupiah, shiftDay, todayISO } from "@/src/format";
 import { usesNativeTabs } from "@/src/navigation";
 import { LunasStamp, StatusBadge } from "@/src/components/debt-ui";
@@ -83,11 +83,24 @@ export default function RiwayatScreen() {
           </Pressable>
         </View>
       </View>
-      <HScroll>
-        {FILTERS.map((f) => (
-          <Chip key={f.key} label={`${f.label}  ${counts[f.key]}`} active={filter === f.key} onPress={() => setFilter(f.key)} testID={`filter-${f.key}`} />
-        ))}
-      </HScroll>
+      <View style={s.filterTable} testID="filter-table">
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          return (
+            <Pressable
+              key={f.key}
+              testID={`filter-${f.key}`}
+              onPress={() => setFilter(f.key)}
+              style={[s.filterCell, active && s.filterCellActive]}
+            >
+              <Text style={[s.filterLabel, active && s.filterLabelActive]} numberOfLines={1}>
+                {f.label}
+              </Text>
+              <Text style={[s.filterCount, active && s.filterCountActive]}>{counts[f.key]}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <FlatList
         data={rows}
         keyExtractor={(r) => (r.kind === "head" ? `h-${r.date}` : r.tx.id)}
@@ -163,6 +176,20 @@ export default function RiwayatScreen() {
 const useS = makeStyles((c) => ({
   root: { flex: 1, backgroundColor: c.surface },
   top: { paddingHorizontal: 16, paddingTop: 16 },
+  filterTable: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginTop: 14,
+    backgroundColor: c.surfaceTertiary,
+    borderRadius: 14,
+    padding: 4,
+  },
+  filterCell: { flex: 1, minHeight: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingVertical: 4 },
+  filterCellActive: { backgroundColor: c.surfaceSecondary, shadowColor: c.onSurface, shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  filterLabel: { fontSize: 12, fontWeight: "600", color: c.muted },
+  filterLabelActive: { color: c.brandPrimary, fontWeight: "800" },
+  filterCount: { fontSize: 11, fontWeight: "700", color: c.muted, fontFamily: MONO, marginTop: 1 },
+  filterCountActive: { color: c.brandPrimary },
   title: { fontSize: 26, fontWeight: "800", color: c.onSurface, letterSpacing: -0.5 },
   titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   todayBtn: { height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: c.brandTertiary, justifyContent: "center" },

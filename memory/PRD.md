@@ -16,7 +16,7 @@ User choices: offline storage on phone only, same look as web (green CatatAgen),
 - Tab Piutang: total hutang, Top 5 grafik (Nominal/Jumlah Transaksi), tabel belum lunas >7 hari, daftar pelanggan + cari, Detail/Lunas/Cicil/Hapus
 - /piutang-detail: riwayat hutang per produk (tanggal, produk, hutang awal, dibayar, belum bayar), Tandai Lunas per produk, cap LUNAS, riwayat pembayaran
 - Cicil dipotong FIFO (hutang terlama dulu); Hapus = hapus catatan hutang saja (transaksi tetap)
-- Riwayat: badge status hutang (kartu Piutang 7 hari di Rekap dihapus atas permintaan user)
+- Riwayat: badge status hutang; tombol filter kategori menjadi satu tabel pilihan (segmented) dengan jumlah
 - Admin: Kategori PPOB bisa diatur sendiri (settings.ppobCategories)
 - Backup v3 menyertakan customers & payments
 - Target laba harian (atur sendiri) + progress bar persen di layar Input
